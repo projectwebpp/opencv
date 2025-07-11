@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Face Register</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <style>
+        * {
+            font-family: Mitr, sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100%;
+            background-color: #f8f9fa;
+        }
+        .login-container {
+            background: #fff;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            min-height: 100vh;
+            margin-top: 2rem;
+        }
+        .login-container h2 {
+            margin-bottom: 1.5rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-control {
+            border-radius: 4px;
+        }
+        .register-link {
+            display: block;
+            text-align: center;
+            margin-top: 1rem;
+        }
+        #overlay {
+            position: absolute;
+            display: none;
+        }
+        #detection-alert {
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 1.2rem;
+        }
+        #video {
+            transform: scaleX(-1);
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 d-flex justify-content-center">
+                <div class="login-container rounded-4">
+                    <h2 class="text-center"><span class="text-primary"><i class="fa-solid fa-user-plus"></i> Face</span> Register</h2>
+                    <form>
+                        <div id="detection-alert" style="display:none" class="text-center w-100"></div>
+                        <div class="d-flex mb-3">
+                            <div class="col me-2">
+                                <input id="name" class="form-control rounded-3" placeholder="ชื่อ-นามสกุล" required>
+                            </div>
+                        </div>
+                        <div id="camera" style="width:100%" class="bg-body-secondary rounded-4 d-none justify-content-center align-items-center mb-3">
+                            <i class="bi bi-camera-video text-muted" style="font-size:3rem"></i>
+                            <video id="video" autoplay class="d-none rounded-4" style="width:100%"></video>
+                            <canvas id="overlay"></canvas>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" id="toggle-camera" class="btn btn-primary rounded-3 w-100">
+                                <i class="bi bi-camera-fill me-2"></i>เริ่มการสแกนใบหน้า
+                            </button>
+                        </div>
+                        <div class="d-none gap-2 mt-3">
+                            <div class="col me-1">
+                                <label for="inputSize" class="form-label">Input Size:</label>
+                                <select id="inputSize" class="form-select rounded-3">
+                                    <option value="128">128</option>
+                                    <option value="160">160</option>
+                                    <option value="224">224</option>
+                                    <option value="320">320</option>
+                                    <option value="416">416</option>
+                                    <option value="512" selected>512</option>
+                                    <option value="608">608</option>
+                                </select>
+                            </div>
+                            <div class="col">
+                                <label for="threshold" class="form-label">Threshold:</label>
+                                <input type="range" class="form-range" id="threshold" min="0.1" max="0.9" step="0.1" value="0.5">
+                                <div class="text-center"><span id="thresholdValue">0.5</span></div>
+                            </div>
+                        </div>
+                        <script>
+                            $("#threshold").on("input", function() {
+                                $("#thresholdValue").text($(this).val());
+                            });
+                        </script>
+                        <div class="d-flex mt-4 justify-content-center">หากคุณมีบัญชีอยู่แล้ว? <a href="index.html">เข้าสู่ระบบ</a></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div id="selfie-wrapper" class="row justify-content-center mt-3"></div>
+    </div>
+
+    <script>
+        // Configuration variables
+        const script_url = "https://script.google.com/macros/s/AKfycbyeh-GVnGCz3J7WfXrctXHhMFi4NLDCIcljU9e4vbyw4zlaJFAt-GPOaY2ZfzmTDv8D0Q/exec";
+        let INPUT_SIZE = 160;
+        let THRESHOLD = 0.6;
+        let playInterval = null;
+        const arr_descriptions = [];
+
+        // Check WebGL support
+        function isWebGLSupported() {
+            try {
+                const canvas = document.createElement('canvas');
+                return !!window.WebGLRenderingContext && 
+                       (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // Check if mobile device
+        function isMobileDevice() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        // Open webcam for face capture
+        async function openWebcamForSelfie() {
+            const constraints = {
+                video: {
+                    facingMode: "user",
+                    width: isMobileDevice() ? $("#video").width() : $("#video").width(),
+                    height: isMobileDevice() ? $("#video").width() : $("#video").height(),
+                    frameRate: { ideal: 30, min: 10 }
+                },
+                audio: false
+            };
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = $("#video")[0];
+                video.srcObject = stream;
+                video.onloadedmetadata = function() {
+                    video.play();
+                    console.log("Video dimensions: " + video.videoWidth + "x" + video.videoHeight);
+                };
+            } catch (err) {
+                console.error("Camera error:", err);
+                Swal.fire({
+                    icon: "error",
+                    title: "กล้องไม่ทำงาน",
+                    text: "ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตการเข้าถึงกล้องและลองใหม่อีกครั้ง",
+                    customClass: { popup: "rounded-4" }
+                });
+            }
+        }
+
+        // Calculate average face descriptor
+        function averageDescriptor(descriptors) {
+            const avg = new Float32Array(128);
+            descriptors.forEach(desc => {
+                for (let i = 0; i < 128; i++) {
+                    avg[i] += desc[i];
+                }
+            });
+            for (let i = 0; i < 128; i++) {
+                avg[i] /= descriptors.length;
+            }
+            return avg;
+        }
+
+        // Save face description to server
+        function saveFaceDescription(faceData) {
+            console.log("Saving face description:", faceData);
+            $.ajax({
+                url: script_url,
+                method: "POST",
+                data: {
+                    opt: "saveFaceDescription",
+                    label: faceData.label,
+                    descriptions: JSON.stringify(faceData.descriptions)
+                },
+                success: function(response) {
+                    console.log(response);
+                    if (response.success) {
+                        Swal.fire({
+                            icon: "success",
+                            title: "ลงทะเบียนสำเร็จ",
+                            text: "ใบหน้าของคุณได้ถูกบันทึกเรียบร้อยแล้ว",
+                            confirmButtonText: "ไปที่หน้าเข้าสู่ระบบ",
+                            allowOutsideClick: false,
+                            customClass: { popup: "rounded-4" }
+                        }).then(() => {
+                            window.location.href = "index.html";
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: "error",
+                            title: "ไม่สามารถบันทึกข้อมูลใบหน้าได้",
+                            text: response.message,
+                            customClass: { popup: "rounded-4" }
+                        });
+                    }
+                },
+                error: function(err) {
+                    console.error(err);
+                    Swal.fire({
+                        icon: "error",
+                        title: "เกิดข้อผิดพลาด",
+                        text: "ไม่สามารถบันทึกข้อมูลใบหน้าได้ กรุณาลองใหม่อีกครั้ง",
+                        customClass: { popup: "rounded-4" }
+                    });
+                }
+            });
+        }
+
+        // Face detection handler
+        async function onPlay() {
+            const video = $("#video")[0];
+            const canvas = $("#overlay")[0];
+            
+            // Ensure canvas is visible
+            $(canvas).not(":visible") && $(canvas).show();
+            
+            const displaySize = {
+                width: $("#video").width(),
+                height: $("#video").height()
+            };
+            
+            const detectionOptions = new faceapi.TinyFaceDetectorOptions({
+                inputSize: INPUT_SIZE,
+                scoreThreshold: THRESHOLD
+            });
+            
+            const detections = await faceapi.detectSingleFace(video, detectionOptions)
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+            
+            const ctx = canvas.getContext("2d", { willReadFrequently: true });
+            
+            if (!detections || !detections.detection) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                $("#detection-alert").html('<i class="bi bi-exclamation-triangle-fill text-danger"></i> <span class="text-danger">ไม่พบใบหน้า</span>').show();
+                return;
+            }
+            
+            faceapi.matchDimensions(canvas, displaySize, true);
+            
+            await new Promise(async (resolve) => {
+                const resizedResults = faceapi.resizeResults(detections, displaySize);
+                const minFaceSize = 200;
+                
+                let boxColor = "#2ecc71";
+                let message = "กรุณาอยู่นิ่งๆ " + arr_descriptions.length + "%";
+                let fillColor = "#2ecc71";
+                
+                // Check if face is too small
+                if (resizedResults.detection.box.width < minFaceSize || resizedResults.detection.box.height < minFaceSize) {
+                    boxColor = "#dc3545";
+                    message = "กรุณาเข้าใกล้กล้องมากขึ้น";
+                    fillColor = "#dc3545";
+                    $("#detection-alert").html('<i class="bi bi-exclamation-triangle-fill text-danger"></i> <span class="text-danger">ใบหน้าห่างเกินไป</span>').show();
+                } else {
+                    $("#detection-alert").html('<i class="bi bi-check-circle-fill text-success"></i> <span class="text-success">กรุณาอยู่นิ่งๆ</span>').show();
+                }
+                
+                // Show canvas if hidden
+                $(canvas).not(":visible") && $(canvas).show();
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = boxColor;
+                ctx.lineWidth = 3;
+                
+                // Adjust face box
+                const box = {...resizedResults.detection.box};
+                if (resizedResults.landmarks) {
+                    try {
+                        const landmarks = resizedResults.landmarks.positions;
+                        let minX = Number.MAX_VALUE, minY = Number.MAX_VALUE;
+                        let maxX = Number.MIN_VALUE, maxY = Number.MIN_VALUE;
+                        
+                        landmarks.forEach(point => {
+                            minX = Math.min(minX, point.x);
+                            minY = Math.min(minY, point.y);
+                            maxX = Math.max(maxX, point.x);
+                            maxY = Math.max(maxY, point.y);
+                        });
+                        
+                        const paddingX = 0.1 * (maxX - minX);
+                        const paddingY = 0.1 * (maxY - minY);
+                        
+                        box.x = minX - paddingX;
+                        box.y = minY - paddingY;
+                        box.width = maxX - minX + 2 * paddingX;
+                        box.height = maxY - minY + 2 * paddingY;
+                    } catch (e) {
+                        console.error("Error adjusting face box:", e);
+                    }
+                }
+                
+                // Draw face box
+                ctx.beginPath();
+                ctx.rect(box.x, box.y, box.width, box.height);
+                ctx.stroke();
+                ctx.rect(box.x, box.y, box.width, box.height);
+                ctx.fillStyle = fillColor;
+                ctx.fill();
+                ctx.closePath();
+                
+                // Draw info box
+                ctx.beginPath();
+                ctx.rect(box.x - 3, box.y - 30, box.width + 6, 30);
+                ctx.fillStyle = boxColor;
+                ctx.fill();
+                
+                // Draw text
+                ctx.font = "16px Mitr";
+                ctx.fillStyle = "#000000";
+                ctx.fillText(message, box.x, box.y - 10);
+                ctx.stroke();
+                
+                await new Promise(requestAnimationFrame);
+                
+                // Check if face is too small
+                if (resizedResults.detection.box.width < minFaceSize || resizedResults.detection.box.height < minFaceSize) {
+                    resolve(false);
+                    return;
+                }
+                
+                // Add descriptor to array
+                arr_descriptions.push(detections.descriptor);
+                console.log("Descriptors collected:", arr_descriptions.length);
+                
+                // If we have enough descriptors
+                if (arr_descriptions.length === 100) {
+                    video.pause();
+                    Swal.fire({
+                        icon: "info",
+                        title: "กำลังประมวลผลข้อมูลใบหน้า",
+                        text: "กรุณารอสักครู่...",
+                        allowOutsideClick: false,
+                        customClass: { popup: "rounded-4" },
+                        didOpen: () => { Swal.showLoading(); }
+                    });
+                    
+                    let name = $("#name").val();
+                    let avgDescriptor = averageDescriptor(arr_descriptions);
+                    let faceData = {
+                        label: name,
+                        descriptions: Array.from(avgDescriptor)
+                    };
+                    
+                    clearInterval(playInterval);
+                    saveFaceDescription(faceData);
+                    resolve(false);
+                }
+                
+                resolve(true);
+            });
+        }
+
+        // Initialize page
+        $(document).ready(function() {
+            // Set aspect ratio based on device
+            const aspectRatio = isMobileDevice() ? "9/16" : "16/9";
+            console.log("Device detected: " + (isMobileDevice() ? "mobile" : "desktop"));
+            $("#video, #camera").css("aspect-ratio", aspectRatio);
+            
+            // Check WebGL support
+            if (!isWebGLSupported()) {
+                Swal.fire({
+                    icon: "error",
+                    title: "ไม่รองรับ WebGL",
+                    html: "อุปกรณ์ของคุณไม่รองรับ WebGL ซึ่งจำเป็นสำหรับแอปพลิเคชันนี้ กรุณาเปิดใช้งาน WebGL หรือใช้แฟลก <code>--enable-unsafe-swiftshader</code> สำหรับเนื้อหาที่เชื่อถือได้",
+                    customClass: { popup: "rounded-4" },
+                    allowOutsideClick: false
+                });
+                return;
+            }
+            
+            // Load face detection models
+            Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri("./models"),
+                faceapi.nets.faceRecognitionNet.loadFromUri("./models"),
+                faceapi.nets.faceLandmark68Net.loadFromUri("./models"),
+                faceapi.nets.ssdMobilenetv1.loadFromUri("./models")
+            ]).then(() => {
+                console.log("Models loaded: " + faceapi.tf.engine().state.numTensors + " tensors");
+                Swal.close();
+                console.log(faceapi.nets);
+                console.log("load model success");
+            }).catch(err => console.log(err));
+            
+            // Set up input size change handler
+            $("#inputSize").on("change", function() {
+                INPUT_SIZE = parseInt($(this).val());
+                console.log("Input size changed to:", INPUT_SIZE);
+            });
+            
+            // Set up threshold change handler
+            $("#threshold").on("input", function() {
+                THRESHOLD = parseFloat($(this).val());
+                console.log("Threshold changed to:", THRESHOLD);
+            });
+            
+            // Set up camera toggle button
+            $("#toggle-camera").on("click", function() {
+                if ($(this).attr("data-action") == "stop") {
+                    // Stop camera
+                    $("#video").addClass("d-none");
+                    $("#camera i").removeClass("d-none").addClass("d-flex");
+                    $(canvas).removeClass("d-flex").addClass("d-none");
+                    $("#detection-alert").hide().html("");
+                    $("#video")[0].pause();
+                    arr_descriptions.length = 0;
+                    
+                    $(this).html('<i class="bi bi-camera-fill me-2"></i>เริ่มการสแกนใบหน้า')
+                        .attr("data-action", "start")
+                        .removeClass("btn-danger")
+                        .addClass("btn-primary");
+                    return;
+                }
+                
+                // Start camera
+                if ($("#name").val() !== "") {
+                    $("#camera i").addClass("d-none").removeClass("d-flex");
+                    $("#video").removeClass("d-none");
+                    $("#overlay").show();
+                    $("#detection-alert").hide().html("");
+                    
+                    $(this).html('<i class="bi bi-camera-video me-2"></i>หยุดสแกนใบหน้า')
+                        .attr("data-action", "stop")
+                        .removeClass("btn-primary")
+                        .addClass("btn-danger");
+                    
+                    openWebcamForSelfie();
+                } else {
+                    Swal.fire({
+                        icon: "warning",
+                        title: "คำเตือน",
+                        text: "กรุณากรอกชื่อ-นามสกุลก่อนเริ่มการสแกนใบหน้า",
+                        customClass: { popup: "rounded-4" },
+                        confirmButtonText: "ตกลง"
+                    });
+                }
+            });
+            
+            // Set up video play event
+            $("#video").on("play", function() {
+                let video = $("#video")[0];
+                if (playInterval) clearInterval(playInterval);
+                playInterval = setInterval(async () => {
+                    if (!video.paused && !video.ended) {
+                        await onPlay();
+                    }
+                }, 60);
+            });
+        });
+    </script>
+
+    <script src="./face-api.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
+</body>
+</html>
