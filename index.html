@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Metadata และการตั้งค่า Cache -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login Page</title>
+  
+  <!-- การนำเข้าไลบรารีและสไตล์ -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- สไตล์ CSS -->
+  <style>
+    * {
+      font-family: Mitr, sans-serif;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      width: 100%;
+    }
+    .login-container {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,.1);
+      width: 100%;
+      max-width: 800px;
+      margin-top: 1rem;
+    }
+    /* ... สไตล์อื่นๆ ... */
+  </style>
+</head>
+
+<body class="bg-light">
+  <div class="container-fluid">
+    <div class="row justify-content-center">
+      <div class="col-12 d-flex justify-content-center">
+        <div class="login-container rounded-4">
+          <h2 class="text-center">
+            <span class="text-primary"><i class="bi bi-person-bounding-box"></i> Face</span> Login
+          </h2>
+          <form>
+            <div id="detection-alert" style="display:none" class="text-center w-100"></div>
+            <div id="camera" class="bg-body-secondary rounded-4 d-flex justify-content-center align-items-center mb-3">
+              <i class="bi bi-camera-video text-muted" style="font-size:3rem"></i>
+              <video id="video" autoplay class="d-none rounded-4" style="width:100%"></video>
+              <canvas id="overlay"></canvas>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" id="toggle-camera" class="btn btn-primary rounded-3 w-100">
+                <i class="bi bi-camera-fill me-2"></i>เข้าสู่ระบบ
+              </button>
+            </div>
+            <div class="d-flex mt-4 justify-content-center">
+              ยังไม่มีบัญชีผู้ใช้? <a href="register.html">ลงทะเบียน</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div id="selfie-wrapper" class="row justify-content-center mt-3"></div>
+  </div>
+
+  <!-- การนำเข้า JavaScript -->
+  <script src="./face-api.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <!-- ฟังก์ชันหลักของระบบ -->
+  <script>
+    // ฟังก์ชันตรวจสอบ WebGL
+    function isWebGLSupported() {
+      try {
+        const canvas = document.createElement('canvas');
+        return !!window.WebGLRenderingContext && 
+               (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+      } catch(e) {
+        return false;
+      }
+    }
+
+    // ฟังก์ชันตรวจสอบอุปกรณ์มือถือ
+    function isMobileDevice() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    // เปิดกล้องสำหรับถ่ายรูป
+    async function openWebcamForSelfie() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: isMobileDevice() ? $('#video').width() : $('#video').height(),
+            height: isMobileDevice() ? $('#video').height() : $('#video').width(),
+            frameRate: { ideal: 30, min: 10 }
+          },
+          audio: false
+        });
+        video.srcObject = stream;
+      } catch(err) {
+        console.error(err);
+      }
+    }
+
+    // กำหนดค่าสำหรับอุปกรณ์มือถือ
+    if(isMobileDevice()) {
+      INPUT_SIZE = 128;
+      THRESHOLD = 0.6;
+    }
+
+    // การทำงานเมื่อคลิกปุ่มเปิดกล้อง
+    $("#toggle-camera").on("click", function() {
+      $("#toggle-camera").addClass("d-none");
+      $("#camera i").removeClass("d-none").addClass("d-block");
+      $("#video").removeClass("d-none");
+      $("#detection-alert").html("กรุณารอสักครู่...");
+      openWebcamForSelfie();
+    });
+
+    // โหลดโมเดลเมื่อหน้าเว็บโหลดเสร็จ
+    $(document).ready(function() {
+      const deviceType = isMobileDevice() ? "mobile" : "desktop";
+      console.log("Device detected: " + deviceType);
+
+      const aspectRatio = isMobileDevice() ? "9/16" : "16/9";
+      $("#camera").css("aspect-ratio", aspectRatio);
+
+      if(isWebGLSupported()) {
+        // โหลดโมเดล face-api.js
+        Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri("./models"),
+          faceapi.nets.faceLandmark68Net.loadFromUri("./models"),
+          faceapi.nets.faceRecognitionNet.loadFromUri("./models"),
+          faceapi.nets.ssdMobilenetv1.loadFromUri("./models")
+        ]).then(() => {
+          console.log("Models loaded: " + faceapi.tf.engine().state.numTensors + " tensors");
+          Swal.close();
+          console.log(faceapi.nets);
+          console.log("load model success");
+        }).catch(err => console.error(err));
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "ไม่รองรับ WebGL",
+          html: "อุปกรณ์ของคุณไม่รองรับ WebGL ซึ่งจำเป็นสำหรับแอปพลิเคชันนี้...",
+          customClass: { popup: "rounded-4" },
+          allowOutsideClick: false
+        });
+      }
+    });
+
+    // ตรวจจับใบหน้าเมื่อวิดีโอเล่น
+    $("#video").on("play", async function() {
+      $("i.bi-camera-video").addClass("d-none");
+      $("#video").removeClass("d-none");
+      
+      let video = $("#video")[0];
+      if(playInterval) clearInterval(playInterval);
+      
+      playInterval = setInterval(async () => {
+        if(video.paused || video.ended) {
+          clearInterval(playInterval);
+        } else {
+          await onPlay();
+        }
+      }, 60);
+    });
+
+    // ฟังก์ชันตรวจจับใบหน้า
+    async function onPlay() {
+      const canvas = $("#overlay")[0];
+      if($(canvas).is(":visible")) $(canvas).show();
+      
+      const video = document.getElementById("video");
+      const displaySize = {
+        width: $("#video").width(),
+        height: $("#video").height()
+      };
+      
+      const detectionOptions = new faceapi.TinyFaceDetectorOptions({
+        inputSize: INPUT_SIZE,
+        scoreThreshold: THRESHOLD
+      });
+      
+      const detection = await faceapi.detectSingleFace(video, detectionOptions)
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+      
+      if(detection && detection.detection && detection.detection.box) {
+        // ประมวลผลการตรวจจับใบหน้า
+        // ... (โค้ดการวาดกรอบใบหน้าและการประมวลผล)
+        
+        // ส่งข้อมูลใบหน้าไปตรวจสอบ
+        if(arr_descriptions.length === 10) {
+          video.pause();
+          Swal.fire({
+            title: "ยืนยันตัวตนสำเร็จ",
+            text: "กรุณารอสักครู่...",
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading() },
+            customClass: { popup: "rounded-4" }
+          });
+          
+          playInterval = null;
+          let avgDescriptor = averageDescriptor(arr_descriptions);
+          clearInterval(playInterval);
+          arr_descriptions.length = 0;
+          return authenFace(Array.from(avgDescriptor));
+        }
+      }
+    }
+
+    // ฟังก์ชันคำนวณค่าเฉลี่ยของใบหน้า
+    function averageDescriptor(descriptors) {
+      const result = new Float32Array(128);
+      descriptors.forEach(desc => {
+        for(let i = 0; i < 128; i++) {
+          result[i] += desc[i];
+        }
+      });
+      
+      for(let i = 0; i < 128; i++) {
+        result[i] /= descriptors.length;
+      }
+      
+      return result;
+    }
+
+    // ฟังก์ชันยืนยันตัวตน
+    function authenFace(descriptor) {
+      $.ajax({
+        url: "https://script.google.com/macros/s/AKfycbxQ4oAyn5b-sPEHqaZQr2Ht6YG5OBeQL5CQ1BSFEX7F-T5iJy9HJk6Et4gbcF2s2vuT/exec",
+        method: "POST",
+        data: {
+          descriptions: JSON.stringify(descriptor),
+          opt: "authenFace"
+        },
+        success: function(response) {
+          if(response.success) {
+            Swal.fire({
+              icon: "success",
+              title: "ยืนยันตัวตนสำเร็จ",
+              customClass: { popup: "rounded-4" },
+              confirmButtonText: "ตกลง",
+              timer: 2000
+            }).then(() => {
+              if(video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                playInterval = null;
+              }
+              $("#selfie-wrapper").html('<p class="text-center h1">ยินดีต้อนรับ ' + response.label + '</p>');
+            });
+          } else {
+            Swal.fire({
+              icon: "error",
+              title: "ไม่สามารถยืนยันตัวตนได้",
+              text: "ไม่พบใบหน้าที่ตรงกันในระบบ",
+              customClass: { popup: "rounded-4" },
+              confirmButtonText: "สแกนใบหน้าใหม่",
+              allowOutsideClick: false
+            }).then(() => {
+              arr_descriptions.length = 0;
+              video.play();
+            });
+          }
+        },
+        error: function(xhr, status, error) {
+          console.error(error);
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "An error occurred while processing your request.",
+            customClass: { popup: "rounded-4" }
+          });
+        }
+      });
+    }
+
+    // ป้องกันการเปิด Developer Tools
+    !function() {
+      let state = { open: false, orientation: null };
+      const toggle = (open) => {
+        if(open !== state.open) {
+          state.open = open;
+          if(open) {
+            alert("กรุณาอย่าเปิด Inspect ครับ");
+            window.location.href = "about:blank";
+          }
+        }
+      };
+      
+      setInterval(() => {
+        const widthDiff = window.outerWidth - window.innerWidth > 160;
+        const heightDiff = window.outerHeight - window.innerHeight > 160;
+        
+        if(!(window.Firebug && window.Firebug.chrome && window.Firebug.chrome.isInitialized) && 
+           !widthDiff && !heightDiff) {
+          toggle(false);
+        } else {
+          toggle(true);
+        }
+      }, 1000);
+    }();
+
+    // ป้องกันการคลิกขวาและปุ่มลัด
+    document.addEventListener("contextmenu", e => e.preventDefault());
+    document.onkeydown = function(e) {
+      if(e.key === "F12" || 
+         (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "J")) || 
+         (e.ctrlKey && e.key === "U")) {
+        return false;
+      }
+    };
+  </script>
+</body>
+</html>
