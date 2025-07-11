@@ -81,6 +81,11 @@
             font-size: 3rem;
             color: #6c757d;
         }
+        .loading-models {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
     </style>
 </head>
 <body>
@@ -92,7 +97,14 @@
                         <span class="text-primary"><i class="fa-solid fa-user-plus"></i> Face</span> Register
                     </h2>
                     
-                    <form id="registerForm">
+                    <div id="loading-models" class="loading-models">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">กำลังโหลดโมเดลตรวจจับใบหน้า...</p>
+                    </div>
+                    
+                    <form id="registerForm" style="display: none;">
                         <div id="detection-alert" style="display:none" class="text-center w-100"></div>
                         
                         <div class="mb-3">
@@ -141,6 +153,7 @@
         let playInterval = null;
         let faceDescriptors = [];
         let videoStream = null;
+        let modelsLoaded = false;
 
         // DOM Elements
         const videoEl = document.getElementById('video');
@@ -148,6 +161,8 @@
         const cameraToggleBtn = document.getElementById('toggle-camera');
         const detectionAlert = document.getElementById('detection-alert');
         const nameInput = document.getElementById('name');
+        const loadingEl = document.getElementById('loading-models');
+        const formEl = document.getElementById('registerForm');
 
         // Initialize application
         $(document).ready(async function() {
@@ -160,19 +175,42 @@
             // Load face detection models
             try {
                 await loadFaceModels();
+                modelsLoaded = true;
+                
+                // Hide loading and show form
+                loadingEl.style.display = 'none';
+                formEl.style.display = 'block';
+                
                 setupEventListeners();
             } catch (error) {
                 console.error('Initialization error:', error);
-                showError('Failed to initialize face detection. Please try again.');
+                loadingEl.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        ไม่สามารถโหลดโมเดลได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต
+                    </div>
+                `;
             }
         });
 
         // Load required face detection models
         async function loadFaceModels() {
-            await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-            await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-            await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
-            console.log('Face detection models loaded');
+            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+            
+            console.log('Loading face detection models...');
+            
+            try {
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+                ]);
+                
+                console.log('Face detection models loaded successfully');
+            } catch (error) {
+                console.error('Model loading error:', error);
+                throw new Error('Failed to load face detection models');
+            }
         }
 
         // Set up event listeners
@@ -184,13 +222,18 @@
             videoEl.addEventListener('play', onVideoPlay);
             
             // Form submission
-            document.getElementById('registerForm').addEventListener('submit', function(e) {
+            formEl.addEventListener('submit', function(e) {
                 e.preventDefault();
             });
         }
 
         // Toggle camera on/off
         async function toggleCamera() {
+            if (!modelsLoaded) {
+                showError('โมเดลยังไม่ถูกโหลด กรุณารอสักครู่');
+                return;
+            }
+
             if (cameraToggleBtn.getAttribute('data-action') === 'stop') {
                 stopCamera();
                 return;
@@ -241,11 +284,13 @@
             videoEl.classList.remove('d-none');
             document.querySelector('.camera-placeholder i').classList.add('d-none');
             
-            // Set canvas dimensions
-            const videoWidth = videoEl.offsetWidth;
-            const videoHeight = videoEl.offsetHeight;
-            canvasEl.width = videoWidth;
-            canvasEl.height = videoHeight;
+            // Set canvas dimensions when video is loaded
+            videoEl.addEventListener('loadedmetadata', () => {
+                const videoWidth = videoEl.offsetWidth;
+                const videoHeight = videoEl.offsetHeight;
+                canvasEl.width = videoWidth;
+                canvasEl.height = videoHeight;
+            });
         }
 
         // Stop camera
